@@ -28,4 +28,26 @@ describe("POST /api/admin/tables", () => {
     expect(res.status).toBe(201);
     expect(insert).toHaveBeenCalledWith({ numero: 7, slug: "table-7" });
   });
+
+  it("returns 400 for a non-positive table number", async () => {
+    requireStaff.mockResolvedValue({ id: "staff-1", nom: "Alex" });
+
+    const res = await POST(
+      new Request("http://localhost", { method: "POST", body: JSON.stringify({ numero: 0 }) })
+    );
+
+    expect(res.status).toBe(400);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for a non-integer table number", async () => {
+    requireStaff.mockResolvedValue({ id: "staff-1", nom: "Alex" });
+
+    const res = await POST(
+      new Request("http://localhost", { method: "POST", body: JSON.stringify({ numero: 3.5 }) })
+    );
+
+    expect(res.status).toBe(400);
+    expect(insert).not.toHaveBeenCalled();
+  });
 });

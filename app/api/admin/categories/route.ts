@@ -8,6 +8,10 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as { nom: string; emoji?: string; ordre: number };
 
+  if (!body.nom || !body.nom.trim()) {
+    return Response.json({ error: "nom requis" }, { status: 400 });
+  }
+
   const supabase = createSupabaseServiceClient();
   const { error } = await supabase.from("categories").insert({
     nom: body.nom,

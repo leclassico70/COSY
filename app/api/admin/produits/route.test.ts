@@ -72,6 +72,28 @@ describe("/api/admin/produits", () => {
     });
   });
 
+  it("POST returns 400 when nom is missing", async () => {
+    requireStaff.mockResolvedValue({ id: "staff-1", nom: "Alex" });
+
+    const res = await POST(
+      req("POST", { categorieId: "cat-1", nom: "  ", description: "", prixCentimes: 220 })
+    );
+
+    expect(res.status).toBe(400);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("POST returns 400 when prixCentimes is negative", async () => {
+    requireStaff.mockResolvedValue({ id: "staff-1", nom: "Alex" });
+
+    const res = await POST(
+      req("POST", { categorieId: "cat-1", nom: "Donut Classic", description: "", prixCentimes: -1 })
+    );
+
+    expect(res.status).toBe(400);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
   it("PATCH updates fields for a given product id", async () => {
     requireStaff.mockResolvedValue({ id: "staff-1", nom: "Alex" });
     eqUpdate.mockResolvedValue({ error: null });

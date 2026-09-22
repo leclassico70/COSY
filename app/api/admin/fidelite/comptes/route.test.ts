@@ -138,4 +138,31 @@ describe("PATCH /api/admin/fidelite/comptes", () => {
     expect(insertCompte).toHaveBeenCalledWith({ user_id: "client-1" });
     expect(updateCompte).toHaveBeenCalledWith({ points: 1, solde_bons_centimes: 0 });
   });
+
+  it("clamps the balance at zero instead of going negative, and logs the actually-applied delta", async () => {
+    requireStaff.mockResolvedValue({ id: "staff-1", nom: "Alex" });
+    selectCompte.mockReturnValue({
+      eq: () => ({
+        maybeSingle: () =>
+          Promise.resolve({ data: { id: "compte-1", points: 2, solde_bons_centimes: 300 }, error: null }),
+      }),
+    });
+    const eqUpdate = vi.fn().mockResolvedValue({ error: null });
+    updateCompte.mockReturnValue({ eq: eqUpdate });
+    insertMouvement.mockResolvedValue({ error: null });
+
+    const res = await PATCH(
+      req({ userId: "client-1", deltaPoints: -5, deltaSoldeCentimes: -9999, motif: "Correction" })
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateCompte).toHaveBeenCalledWith({ points: 0, solde_bons_centimes: 0 });
+    expect(insertMouvement).toHaveBeenCalledWith({
+      compte_id: "compte-1",
+      delta_points: -2,
+      delta_solde_centimes: -300,
+      motif: "Correction",
+      cree_par: "staff-1",
+    });
+  });
 });

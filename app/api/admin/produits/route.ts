@@ -14,6 +14,13 @@ export async function POST(request: Request) {
     photoUrl?: string | null;
   };
 
+  if (!body.nom || !body.nom.trim()) {
+    return Response.json({ error: "nom requis" }, { status: 400 });
+  }
+  if (!Number.isInteger(body.prixCentimes) || body.prixCentimes < 0) {
+    return Response.json({ error: "prix invalide" }, { status: 400 });
+  }
+
   const supabase = createSupabaseServiceClient();
   const { error } = await supabase.from("produits").insert({
     categorie_id: body.categorieId,
