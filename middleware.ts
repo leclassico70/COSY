@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// This matcher only covers page routes under /admin and /cuisine — it does NOT
+// protect API routes (e.g. /api/admin/**), even ones that sound admin-related.
+// Every staff-only API route must independently call requireStaff() from
+// lib/supabase/requireStaff.ts; don't rely on this middleware for those.
 export async function middleware(request: NextRequest) {
   const isProtected =
     (request.nextUrl.pathname.startsWith("/admin") &&
