@@ -28,3 +28,4 @@ yarn-error.log*
 
 # Brainstorming companion sessions
 .superpowers/
+.worktrees/
