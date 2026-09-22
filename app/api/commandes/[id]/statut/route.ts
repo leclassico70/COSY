@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/serverClient";
+import { requireStaff } from "@/lib/supabase/requireStaff";
 import { createSupabaseServiceClient } from "@/lib/supabase/serviceClient";
 import type { StatutCommande } from "@/lib/supabase/types";
 
@@ -8,12 +8,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabaseAuth = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabaseAuth.auth.getUser();
+  const staff = await requireStaff();
 
-  if (!user) {
+  if (!staff) {
     return Response.json({ error: "authentification requise" }, { status: 401 });
   }
 

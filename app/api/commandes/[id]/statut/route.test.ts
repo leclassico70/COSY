@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const getUser = vi.fn();
+const { requireStaff } = vi.hoisted(() => ({ requireStaff: vi.fn() }));
 const update = vi.fn();
 const eq = vi.fn();
 
-vi.mock("@/lib/supabase/serverClient", () => ({
-  createSupabaseServerClient: () => ({
-    auth: { getUser },
-  }),
+vi.mock("@/lib/supabase/requireStaff", () => ({
+  requireStaff,
 }));
 
 vi.mock("@/lib/supabase/serviceClient", () => ({
@@ -24,7 +22,7 @@ vi.mock("@/lib/supabase/serviceClient", () => ({
 import { PATCH } from "./route";
 
 beforeEach(() => {
-  getUser.mockReset();
+  requireStaff.mockReset();
   update.mockReset();
   eq.mockReset();
 });
@@ -37,8 +35,8 @@ function jsonRequest(body: unknown) {
 }
 
 describe("PATCH /api/commandes/[id]/statut", () => {
-  it("returns 401 when there is no authenticated user", async () => {
-    getUser.mockResolvedValue({ data: { user: null } });
+  it("returns 401 when the caller is not staff", async () => {
+    requireStaff.mockResolvedValue(null);
 
     const res = await PATCH(jsonRequest({ statut: "en_preparation" }), {
       params: Promise.resolve({ id: "cmd-1" }),
@@ -48,7 +46,7 @@ describe("PATCH /api/commandes/[id]/statut", () => {
   });
 
   it("returns 400 for an invalid status value", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "staff-1" } } });
+    requireStaff.mockResolvedValue({ id: "staff-1", nom: "Alex" });
 
     const res = await PATCH(jsonRequest({ statut: "pas_un_statut" }), {
       params: Promise.resolve({ id: "cmd-1" }),
@@ -57,8 +55,8 @@ describe("PATCH /api/commandes/[id]/statut", () => {
     expect(res.status).toBe(400);
   });
 
-  it("updates the status when authenticated with a valid status", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "staff-1" } } });
+  it("updates the status when the caller is staff with a valid status", async () => {
+    requireStaff.mockResolvedValue({ id: "staff-1", nom: "Alex" });
     eq.mockResolvedValue({ error: null });
 
     const res = await PATCH(jsonRequest({ statut: "en_preparation" }), {
