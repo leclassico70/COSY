@@ -15,6 +15,7 @@ export interface Produit {
   description: string;
   prix_centimes: number;
   disponible: boolean;
+  photo_url: string | null;
   ordre: number;
   created_at: string;
 }

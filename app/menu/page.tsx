@@ -29,23 +29,33 @@ export default async function MenuPage() {
             </h2>
             <ul className="mt-4 divide-y divide-cosy-pink/10">
               {produitsCategorie.map((produit) => (
-                <li key={produit.id} className="flex items-start justify-between gap-4 py-3">
-                  <div>
-                    <p className="font-semibold">
-                      {produit.nom}
-                      {!produit.disponible && (
-                        <span className="ml-2 text-xs font-normal uppercase text-cosy-ink/40">
-                          Indisponible
-                        </span>
+                <li key={produit.id} className="flex items-start gap-4 py-3">
+                  {produit.photo_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={produit.photo_url}
+                      alt={produit.nom}
+                      className="h-16 w-16 flex-shrink-0 rounded-lg object-cover"
+                    />
+                  )}
+                  <div className="flex flex-1 items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold">
+                        {produit.nom}
+                        {!produit.disponible && (
+                          <span className="ml-2 text-xs font-normal uppercase text-cosy-ink/40">
+                            Indisponible
+                          </span>
+                        )}
+                      </p>
+                      {produit.description && (
+                        <p className="text-sm text-cosy-ink/60">{produit.description}</p>
                       )}
+                    </div>
+                    <p className="whitespace-nowrap font-display font-bold text-cosy-pink">
+                      {formatPrix(produit.prix_centimes)}
                     </p>
-                    {produit.description && (
-                      <p className="text-sm text-cosy-ink/60">{produit.description}</p>
-                    )}
                   </div>
-                  <p className="whitespace-nowrap font-display font-bold text-cosy-pink">
-                    {formatPrix(produit.prix_centimes)}
-                  </p>
                 </li>
               ))}
             </ul>
