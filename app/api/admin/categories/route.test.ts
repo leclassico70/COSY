@@ -39,4 +39,15 @@ describe("POST /api/admin/categories", () => {
     expect(res.status).toBe(201);
     expect(insert).toHaveBeenCalledWith({ nom: "Bagels", emoji: "🥯", ordre: 1 });
   });
+
+  it("returns 400 when nom is missing", async () => {
+    requireStaff.mockResolvedValue({ id: "staff-1", nom: "Alex" });
+
+    const res = await POST(
+      new Request("http://localhost", { method: "POST", body: JSON.stringify({ nom: "  ", ordre: 1 }) })
+    );
+
+    expect(res.status).toBe(400);
+    expect(insert).not.toHaveBeenCalled();
+  });
 });

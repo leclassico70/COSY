@@ -71,20 +71,27 @@ export async function PATCH(request: Request) {
   const deltaPoints = body.deltaPoints ?? 0;
   const deltaSoldeCentimes = body.deltaSoldeCentimes ?? 0;
 
+  // Un ajustement (ex: faute de frappe sur le montant) ne doit jamais faire
+  // passer le solde du client sous zéro.
+  const nouveauxPoints = Math.max(0, compte.points + deltaPoints);
+  const nouveauSolde = Math.max(0, compte.solde_bons_centimes + deltaSoldeCentimes);
+
   const { error: updateError } = await supabase
     .from("fidelite_comptes")
     .update({
-      points: compte.points + deltaPoints,
-      solde_bons_centimes: compte.solde_bons_centimes + deltaSoldeCentimes,
+      points: nouveauxPoints,
+      solde_bons_centimes: nouveauSolde,
     })
     .eq("id", compte.id);
 
   if (updateError) return Response.json({ error: "mise à jour impossible" }, { status: 500 });
 
+  // On journalise le delta réellement appliqué (après plancher à zéro),
+  // pas la valeur brute demandée, pour que l'historique reflète la réalité.
   const { error: mouvementError } = await supabase.from("fidelite_mouvements").insert({
     compte_id: compte.id,
-    delta_points: deltaPoints,
-    delta_solde_centimes: deltaSoldeCentimes,
+    delta_points: nouveauxPoints - compte.points,
+    delta_solde_centimes: nouveauSolde - compte.solde_bons_centimes,
     motif: body.motif,
     cree_par: staff.id,
   });

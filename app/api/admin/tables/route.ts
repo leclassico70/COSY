@@ -8,6 +8,10 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as { numero: number };
 
+  if (!Number.isInteger(body.numero) || body.numero <= 0) {
+    return Response.json({ error: "numéro de table invalide" }, { status: 400 });
+  }
+
   const supabase = createSupabaseServiceClient();
   const { error } = await supabase.from("tables").insert({
     numero: body.numero,
