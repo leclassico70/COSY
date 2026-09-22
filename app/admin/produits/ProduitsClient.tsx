@@ -71,8 +71,8 @@ export function ProduitsClient({ categoriesInitiales, produitsInitiaux }: Props)
         id: produitId,
         nom: brouillon.nom,
         description: brouillon.description,
-        prixCentimes: brouillon.prixCentimes,
-        categorieId: brouillon.categorieId,
+        prix_centimes: brouillon.prixCentimes,
+        categorie_id: brouillon.categorieId,
       }),
     });
 
