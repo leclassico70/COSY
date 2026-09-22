@@ -4,6 +4,9 @@ import { useState } from "react";
 import { formatPrix } from "@/lib/money";
 import type { Categorie, Produit } from "@/lib/supabase/types";
 
+// Photo upload (lib/supabase/uploadPhoto.ts) and category add/delete
+// (via /api/admin/categories, same pattern as this file) are deliberately
+// not wired up here yet — follow-ups, not oversights.
 interface Props {
   categoriesInitiales: Categorie[];
   produitsInitiaux: Produit[];
@@ -27,13 +30,19 @@ export function ProduitsClient({ categoriesInitiales, produitsInitiaux }: Props)
   const [erreur, setErreur] = useState<string | null>(null);
 
   async function toggleDisponible(produit: Produit) {
+    setErreur(null);
     const disponible = !produit.disponible;
     setProduits((current) => current.map((p) => (p.id === produit.id ? { ...p, disponible } : p)));
 
-    await fetch("/api/admin/produits", {
+    const reponse = await fetch("/api/admin/produits", {
       method: "PATCH",
       body: JSON.stringify({ id: produit.id, disponible }),
     });
+
+    if (!reponse.ok) {
+      setProduits((current) => current.map((p) => (p.id === produit.id ? produit : p)));
+      setErreur("La disponibilité n'a pas pu être mise à jour. Réessayez.");
+    }
   }
 
   function commencerEdition(produit: Produit) {
@@ -49,6 +58,9 @@ export function ProduitsClient({ categoriesInitiales, produitsInitiaux }: Props)
 
   async function enregistrerEdition(produitId: string) {
     if (!brouillon) return;
+    setErreur(null);
+
+    const produitAvant = produits.find((p) => p.id === produitId);
 
     setProduits((current) =>
       current.map((p) =>
@@ -77,17 +89,32 @@ export function ProduitsClient({ categoriesInitiales, produitsInitiaux }: Props)
     });
 
     if (!reponse.ok) {
-      setErreur("La mise à jour n'a pas pu être enregistrée. Réessayez.");
+      if (produitAvant) {
+        setProduits((current) => current.map((p) => (p.id === produitId ? produitAvant : p)));
+      }
+      setErreur("La mise à jour n'a pas pu être enregistrée. Vérifiez les champs et réessayez.");
     }
   }
 
   async function supprimer(produitId: string) {
+    const produitAvant = produits.find((p) => p.id === produitId);
+    if (!produitAvant) return;
+    if (!window.confirm(`Supprimer « ${produitAvant.nom} » du menu ? Cette action est irréversible.`)) {
+      return;
+    }
+    setErreur(null);
+
     setProduits((current) => current.filter((p) => p.id !== produitId));
 
-    await fetch("/api/admin/produits", {
+    const reponse = await fetch("/api/admin/produits", {
       method: "DELETE",
       body: JSON.stringify({ id: produitId }),
     });
+
+    if (!reponse.ok) {
+      setProduits((current) => [...current, produitAvant]);
+      setErreur("La suppression a échoué. Réessayez.");
+    }
   }
 
   async function ajouter(e: React.FormEvent) {
@@ -120,6 +147,7 @@ export function ProduitsClient({ categoriesInitiales, produitsInitiaux }: Props)
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="font-display text-2xl font-black uppercase text-cosy-pink">Menu</h1>
+      {erreur && <p className="mt-2 text-sm text-red-600">{erreur}</p>}
 
       {categories.map((categorie) => (
         <section key={categorie.id} className="mt-8">
@@ -249,7 +277,6 @@ export function ProduitsClient({ categoriesInitiales, produitsInitiaux }: Props)
             Ajouter
           </button>
         </form>
-        {erreur && <p className="mt-2 text-sm text-red-600">{erreur}</p>}
         <p className="mt-2 text-xs text-cosy-ink/50">
           La photo se gère ensuite depuis la fiche produit une fois créé (upload à venir dans un module
           dédié).
