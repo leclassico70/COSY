@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   if (!body.tableId) {
     return Response.json({ error: "tableId requis" }, { status: 400 });
   }
-  if (!body.lignes || body.lignes.length === 0) {
+  if (!Array.isArray(body.lignes) || body.lignes.length === 0) {
     return Response.json({ error: "au moins une ligne requise" }, { status: 400 });
   }
 
@@ -45,6 +45,7 @@ export async function POST(request: Request) {
   );
 
   if (lignesError) {
+    await supabase.from("commandes").delete().eq("id", commande.id);
     return Response.json({ error: "impossible d'enregistrer les articles" }, { status: 500 });
   }
 

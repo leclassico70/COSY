@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const insertCommande = vi.fn();
 const insertLignes = vi.fn();
+const deleteCommande = vi.fn();
 
 vi.mock("@/lib/supabase/serviceClient", () => ({
   createSupabaseServiceClient: () => ({
@@ -9,6 +10,7 @@ vi.mock("@/lib/supabase/serviceClient", () => ({
       if (table === "commandes") {
         return {
           insert: insertCommande,
+          delete: deleteCommande,
         };
       }
       if (table === "commande_lignes") {
@@ -26,6 +28,8 @@ import { POST } from "./route";
 beforeEach(() => {
   insertCommande.mockReset();
   insertLignes.mockReset();
+  deleteCommande.mockReset();
+  deleteCommande.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
 });
 
 function jsonRequest(body: unknown) {
@@ -43,6 +47,11 @@ describe("POST /api/commandes", () => {
 
   it("returns 400 when lignes is empty", async () => {
     const res = await POST(jsonRequest({ tableId: "t1", lignes: [] }));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when lignes is not an array", async () => {
+    const res = await POST(jsonRequest({ tableId: "t1", lignes: "oops" }));
     expect(res.status).toBe(400);
   });
 
@@ -91,5 +100,27 @@ describe("POST /api/commandes", () => {
     );
 
     expect(res.status).toBe(500);
+  });
+
+  it("deletes the orphaned commande when the lignes insert fails", async () => {
+    insertCommande.mockReturnValue({
+      select: () => ({
+        single: () => Promise.resolve({ data: { id: "cmd-1" }, error: null }),
+      }),
+    });
+    insertLignes.mockReturnValue(Promise.resolve({ error: { message: "db error" } }));
+    const eqMock = vi.fn().mockResolvedValue({ error: null });
+    deleteCommande.mockReturnValue({ eq: eqMock });
+
+    const res = await POST(
+      jsonRequest({
+        tableId: "t1",
+        lignes: [{ produitId: "p1", nom: "Donut Classic", prixCentimes: 220, quantite: 1 }],
+      })
+    );
+
+    expect(res.status).toBe(500);
+    expect(deleteCommande).toHaveBeenCalled();
+    expect(eqMock).toHaveBeenCalledWith("id", "cmd-1");
   });
 });
