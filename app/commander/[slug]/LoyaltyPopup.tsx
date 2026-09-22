@@ -39,6 +39,9 @@ export function LoyaltyPopup() {
 
     try {
       if (!localStorage.getItem(DISMISS_KEY)) {
+        // Reading localStorage needs the effect (unavailable during SSR) — this is a
+        // one-time sync of UI state with an external store on mount, not a cascading update.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setOuvert(true);
       }
     } catch {
@@ -62,11 +65,17 @@ export function LoyaltyPopup() {
     setMessage(null);
 
     const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.signUp({ email, password: motDePasse });
+    const { data, error } = await supabase.auth.signUp({ email, password: motDePasse });
 
     setEnvoiEnCours(false);
     if (error) {
       setMessage("Impossible de créer le compte. Vérifiez votre email et réessayez.");
+      return;
+    }
+    // Supabase renvoie un utilisateur sans identités (et sans erreur, pour ne pas
+    // révéler qui a déjà un compte) quand l'email est déjà enregistré.
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      setMessage("Un compte existe déjà avec cet email. Essayez de vous connecter.");
       return;
     }
     setMessage("Compte créé ! Vous cumulez des points dès votre prochaine commande.");
