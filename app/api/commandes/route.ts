@@ -2,8 +2,6 @@ import { createSupabaseServiceClient } from "@/lib/supabase/serviceClient";
 
 interface LigneEntree {
   produitId: string;
-  nom: string;
-  prixCentimes: number;
   quantite: number;
 }
 
@@ -24,6 +22,26 @@ export async function POST(request: Request) {
 
   const supabase = createSupabaseServiceClient();
 
+  const produitIds = [...new Set(body.lignes.map((ligne) => ligne.produitId))];
+
+  const { data: produits, error: produitsError } = await supabase
+    .from("produits")
+    .select("id, nom, prix_centimes, disponible")
+    .in("id", produitIds);
+
+  if (produitsError) {
+    return Response.json({ error: "impossible de vérifier les produits" }, { status: 500 });
+  }
+
+  const produitsParId = new Map((produits ?? []).map((produit) => [produit.id, produit]));
+
+  for (const produitId of produitIds) {
+    const produit = produitsParId.get(produitId);
+    if (!produit || !produit.disponible) {
+      return Response.json({ error: "produit invalide ou indisponible" }, { status: 400 });
+    }
+  }
+
   const { data: commande, error: commandeError } = await supabase
     .from("commandes")
     .insert({ table_id: body.tableId, statut: "recue" })
@@ -35,13 +53,16 @@ export async function POST(request: Request) {
   }
 
   const { error: lignesError } = await supabase.from("commande_lignes").insert(
-    body.lignes.map((ligne) => ({
-      commande_id: commande.id,
-      produit_id: ligne.produitId,
-      nom_produit: ligne.nom,
-      prix_unitaire_centimes: ligne.prixCentimes,
-      quantite: ligne.quantite,
-    }))
+    body.lignes.map((ligne) => {
+      const produit = produitsParId.get(ligne.produitId)!;
+      return {
+        commande_id: commande.id,
+        produit_id: ligne.produitId,
+        nom_produit: produit.nom,
+        prix_unitaire_centimes: produit.prix_centimes,
+        quantite: ligne.quantite,
+      };
+    })
   );
 
   if (lignesError) {

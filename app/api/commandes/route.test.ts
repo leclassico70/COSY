@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const insertCommande = vi.fn();
 const insertLignes = vi.fn();
 const deleteCommande = vi.fn();
+const selectProduits = vi.fn();
 
 vi.mock("@/lib/supabase/serviceClient", () => ({
   createSupabaseServiceClient: () => ({
@@ -18,6 +19,11 @@ vi.mock("@/lib/supabase/serviceClient", () => ({
           insert: insertLignes,
         };
       }
+      if (table === "produits") {
+        return {
+          select: selectProduits,
+        };
+      }
       throw new Error(`unexpected table ${table}`);
     },
   }),
@@ -25,11 +31,26 @@ vi.mock("@/lib/supabase/serviceClient", () => ({
 
 import { POST } from "./route";
 
+interface ProduitStub {
+  id: string;
+  nom: string;
+  prix_centimes: number;
+  disponible: boolean;
+}
+
+function mockProduits(produits: ProduitStub[]) {
+  selectProduits.mockReturnValue({
+    in: vi.fn().mockResolvedValue({ data: produits, error: null }),
+  });
+}
+
 beforeEach(() => {
   insertCommande.mockReset();
   insertLignes.mockReset();
   deleteCommande.mockReset();
+  selectProduits.mockReset();
   deleteCommande.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+  mockProduits([{ id: "p1", nom: "Donut Classic", prix_centimes: 220, disponible: true }]);
 });
 
 function jsonRequest(body: unknown) {
@@ -55,7 +76,7 @@ describe("POST /api/commandes", () => {
     expect(res.status).toBe(400);
   });
 
-  it("creates the commande then its lignes, and returns the new id", async () => {
+  it("creates the commande then its lignes, using the product's name and price from the database", async () => {
     insertCommande.mockReturnValue({
       select: () => ({
         single: () => Promise.resolve({ data: { id: "cmd-1" }, error: null }),
@@ -66,7 +87,7 @@ describe("POST /api/commandes", () => {
     const res = await POST(
       jsonRequest({
         tableId: "t1",
-        lignes: [{ produitId: "p1", nom: "Donut Classic", prixCentimes: 220, quantite: 2 }],
+        lignes: [{ produitId: "p1", nom: "Prix truqué", prixCentimes: 1, quantite: 2 }],
       })
     );
 
@@ -85,6 +106,50 @@ describe("POST /api/commandes", () => {
     ]);
   });
 
+  it("returns 400 when a produitId does not exist", async () => {
+    mockProduits([]);
+
+    const res = await POST(
+      jsonRequest({
+        tableId: "t1",
+        lignes: [{ produitId: "inconnu", quantite: 1 }],
+      })
+    );
+
+    expect(res.status).toBe(400);
+    expect(insertCommande).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when a produitId is marked unavailable", async () => {
+    mockProduits([{ id: "p1", nom: "Donut Classic", prix_centimes: 220, disponible: false }]);
+
+    const res = await POST(
+      jsonRequest({
+        tableId: "t1",
+        lignes: [{ produitId: "p1", quantite: 1 }],
+      })
+    );
+
+    expect(res.status).toBe(400);
+    expect(insertCommande).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when the produits lookup fails", async () => {
+    selectProduits.mockReturnValue({
+      in: vi.fn().mockResolvedValue({ data: null, error: { message: "db error" } }),
+    });
+
+    const res = await POST(
+      jsonRequest({
+        tableId: "t1",
+        lignes: [{ produitId: "p1", quantite: 1 }],
+      })
+    );
+
+    expect(res.status).toBe(500);
+    expect(insertCommande).not.toHaveBeenCalled();
+  });
+
   it("returns 500 when the commande insert fails", async () => {
     insertCommande.mockReturnValue({
       select: () => ({
@@ -95,7 +160,7 @@ describe("POST /api/commandes", () => {
     const res = await POST(
       jsonRequest({
         tableId: "t1",
-        lignes: [{ produitId: "p1", nom: "Donut Classic", prixCentimes: 220, quantite: 1 }],
+        lignes: [{ produitId: "p1", quantite: 1 }],
       })
     );
 
@@ -115,7 +180,7 @@ describe("POST /api/commandes", () => {
     const res = await POST(
       jsonRequest({
         tableId: "t1",
-        lignes: [{ produitId: "p1", nom: "Donut Classic", prixCentimes: 220, quantite: 1 }],
+        lignes: [{ produitId: "p1", quantite: 1 }],
       })
     );
 
