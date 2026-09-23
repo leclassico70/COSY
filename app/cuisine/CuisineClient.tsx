@@ -11,8 +11,9 @@ interface Props {
   tables: TableRestaurant[];
 }
 
-export function CuisineClient({ commandesInitiales, lignes, tables }: Props) {
+export function CuisineClient({ commandesInitiales, lignes: lignesInitiales, tables }: Props) {
   const [commandes, setCommandes] = useState(commandesInitiales);
+  const [lignes, setLignes] = useState(lignesInitiales);
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
@@ -36,6 +37,16 @@ export function CuisineClient({ commandesInitiales, lignes, tables }: Props) {
               ? current.filter((c) => c.id !== updated.id)
               : current.map((c) => (c.id === updated.id ? updated : c))
           );
+        }
+      )
+      // Les lignes d'une commande arrivent dans un INSERT séparé (après la commande
+      // elle-même) : sans cet abonnement, une commande reçue après le chargement de la
+      // page s'affiche sans ses articles tant que la page n'est pas rechargée.
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "commande_lignes" },
+        (payload) => {
+          setLignes((current) => [...current, payload.new as CommandeLigne]);
         }
       )
       .subscribe();
