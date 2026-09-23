@@ -20,6 +20,11 @@ export default function AdminDashboard() {
             Programme fidélité
           </Link>
         </li>
+        <li>
+          <Link href="/cuisine" className="font-semibold text-cosy-pink underline">
+            Écran cuisine (commandes en cours)
+          </Link>
+        </li>
       </ul>
     </div>
   );
