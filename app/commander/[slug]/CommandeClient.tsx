@@ -91,7 +91,7 @@ export function CommandeClient({ table, categories, produits }: Props) {
                       className="h-14 w-14 flex-shrink-0 rounded-lg object-cover"
                     />
                   )}
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1">
                     <p className="font-semibold">{produit.nom}</p>
                     <p className="text-sm text-cosy-ink/60">{formatPrix(produit.prix_centimes)}</p>
                   </div>
