@@ -6,9 +6,32 @@ export async function GET(request: Request) {
   if (!staff) return Response.json({ error: "authentification requise" }, { status: 401 });
 
   const email = new URL(request.url).searchParams.get("email");
-  if (!email) return Response.json({ error: "email requis" }, { status: 400 });
-
   const supabase = createSupabaseServiceClient();
+
+  if (!email) {
+    // Pas d'email fourni : on renvoie la liste de tous les comptes fidélité
+    // existants, pour la vue d'ensemble admin.
+    const { data: comptes, error: comptesError } = await supabase
+      .from("fidelite_comptes")
+      .select("user_id, points, solde_bons_centimes")
+      .order("points", { ascending: false });
+
+    if (comptesError) return Response.json({ error: "recherche impossible" }, { status: 500 });
+
+    const { data: utilisateurs, error: authError } = await supabase.auth.admin.listUsers();
+    if (authError) return Response.json({ error: "recherche impossible" }, { status: 500 });
+
+    const emailParId = new Map(utilisateurs.users.map((u) => [u.id, u.email ?? ""]));
+
+    const liste = (comptes ?? []).map((c) => ({
+      userId: c.user_id,
+      email: emailParId.get(c.user_id) ?? "(email inconnu)",
+      points: c.points,
+      soldeBonsCentimes: c.solde_bons_centimes,
+    }));
+
+    return Response.json({ comptes: liste });
+  }
 
   const { data: utilisateurs, error: authError } = await supabase.auth.admin.listUsers();
   if (authError) return Response.json({ error: "recherche impossible" }, { status: 500 });
