@@ -20,6 +20,7 @@ export function LoyaltyPopup() {
   const [motDePasse, setMotDePasse] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  const [succes, setSucces] = useState(false);
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
@@ -79,6 +80,7 @@ export function LoyaltyPopup() {
       return;
     }
     setMessage("Compte créé ! Vous cumulez des points dès votre prochaine commande.");
+    setSucces(true);
   }
 
   async function handleConnexion(e: React.FormEvent) {
@@ -95,6 +97,7 @@ export function LoyaltyPopup() {
       return;
     }
     setMessage("Connecté ! Vos prochaines commandes compteront pour votre fidélité.");
+    setSucces(true);
   }
 
   return (
@@ -124,67 +127,81 @@ export function LoyaltyPopup() {
               </p>
             )}
 
-            {mode === "info" && (
-              <div className="mt-4 flex gap-2">
+            {succes ? (
+              <>
+                {message && <p className="mt-4 text-sm font-semibold text-cosy-pink">{message}</p>}
                 <button
-                  onClick={() => setMode("inscription")}
-                  className="flex-1 rounded-pill bg-cosy-pink py-2 text-sm font-bold text-white"
+                  onClick={fermer}
+                  className="mt-4 w-full rounded-pill bg-cosy-pink py-2 text-sm font-bold text-white"
                 >
-                  Créer un compte
+                  Fermer
                 </button>
-                <button
-                  onClick={() => setMode("connexion")}
-                  className="flex-1 rounded-pill border border-cosy-pink py-2 text-sm font-bold text-cosy-pink"
-                >
-                  Se connecter
+              </>
+            ) : (
+              <>
+                {mode === "info" && (
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      onClick={() => setMode("inscription")}
+                      className="flex-1 rounded-pill bg-cosy-pink py-2 text-sm font-bold text-white"
+                    >
+                      Créer un compte
+                    </button>
+                    <button
+                      onClick={() => setMode("connexion")}
+                      className="flex-1 rounded-pill border border-cosy-pink py-2 text-sm font-bold text-cosy-pink"
+                    >
+                      Se connecter
+                    </button>
+                  </div>
+                )}
+
+                {(mode === "inscription" || mode === "connexion") && (
+                  <form
+                    onSubmit={mode === "inscription" ? handleInscription : handleConnexion}
+                    className="mt-4 space-y-3"
+                  >
+                    <input
+                      type="email"
+                      placeholder="Email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full rounded border border-cosy-ink/20 px-3 py-2 text-sm"
+                      required
+                    />
+                    <input
+                      type="password"
+                      placeholder="Mot de passe"
+                      value={motDePasse}
+                      onChange={(e) => setMotDePasse(e.target.value)}
+                      className="w-full rounded border border-cosy-ink/20 px-3 py-2 text-sm"
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="submit"
+                      disabled={envoiEnCours}
+                      className="w-full rounded-pill bg-cosy-pink py-2 text-sm font-bold text-white disabled:opacity-50"
+                    >
+                      {envoiEnCours ? "..." : mode === "inscription" ? "Créer mon compte" : "Se connecter"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode("info")}
+                      className="w-full text-center text-xs text-cosy-ink/50 underline"
+                    >
+                      Retour
+                    </button>
+                  </form>
+                )}
+
+                {message && <p className="mt-3 text-sm text-cosy-pink">{message}</p>}
+
+                <button onClick={fermer} className="mt-4 w-full text-center text-xs text-cosy-ink/40 underline">
+                  Continuer sans compte
                 </button>
-              </div>
+              </>
             )}
-
-            {(mode === "inscription" || mode === "connexion") && (
-              <form
-                onSubmit={mode === "inscription" ? handleInscription : handleConnexion}
-                className="mt-4 space-y-3"
-              >
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded border border-cosy-ink/20 px-3 py-2 text-sm"
-                  required
-                />
-                <input
-                  type="password"
-                  placeholder="Mot de passe"
-                  value={motDePasse}
-                  onChange={(e) => setMotDePasse(e.target.value)}
-                  className="w-full rounded border border-cosy-ink/20 px-3 py-2 text-sm"
-                  required
-                  minLength={6}
-                />
-                <button
-                  type="submit"
-                  disabled={envoiEnCours}
-                  className="w-full rounded-pill bg-cosy-pink py-2 text-sm font-bold text-white disabled:opacity-50"
-                >
-                  {envoiEnCours ? "..." : mode === "inscription" ? "Créer mon compte" : "Se connecter"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode("info")}
-                  className="w-full text-center text-xs text-cosy-ink/50 underline"
-                >
-                  Retour
-                </button>
-              </form>
-            )}
-
-            {message && <p className="mt-3 text-sm text-cosy-pink">{message}</p>}
-
-            <button onClick={fermer} className="mt-4 w-full text-center text-xs text-cosy-ink/40 underline">
-              Continuer sans compte
-            </button>
           </div>
         </div>
       )}

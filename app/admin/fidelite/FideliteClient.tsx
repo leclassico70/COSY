@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatPrix } from "@/lib/money";
 
 interface ParametresRow {
@@ -35,6 +35,25 @@ export function FideliteClient({ parametresInitiaux }: Props) {
   const [ajustementSolde, setAjustementSolde] = useState("0");
   const [motif, setMotif] = useState("");
   const [messageAjustement, setMessageAjustement] = useState<string | null>(null);
+
+  const [listeComptes, setListeComptes] = useState<CompteRecherche[] | null>(null);
+  const [chargementListe, setChargementListe] = useState(true);
+
+  async function chargerListe() {
+    setChargementListe(true);
+    const res = await fetch("/api/admin/fidelite/comptes");
+    if (res.ok) {
+      const body = (await res.json()) as { comptes: CompteRecherche[] };
+      setListeComptes(body.comptes);
+    }
+    setChargementListe(false);
+  }
+
+  useEffect(() => {
+    // Chargement initial de la liste depuis l'API (source externe) au montage.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    chargerListe();
+  }, []);
 
   async function enregistrerParametres(e: React.FormEvent) {
     e.preventDefault();
@@ -92,6 +111,7 @@ export function FideliteClient({ parametresInitiaux }: Props) {
     setAjustementPoints("0");
     setAjustementSolde("0");
     rechercherCompte(e);
+    chargerListe();
   }
 
   return (
@@ -186,6 +206,36 @@ export function FideliteClient({ parametresInitiaux }: Props) {
               </button>
               {messageAjustement && <p className="text-sm text-cosy-pink">{messageAjustement}</p>}
             </form>
+          </div>
+        )}
+      </section>
+
+      <section className="mt-8 rounded-lg border border-cosy-pink/20 p-4">
+        <h2 className="font-display font-extrabold">Tous les membres</h2>
+        {chargementListe && <p className="mt-2 text-sm text-cosy-ink/50">Chargement...</p>}
+        {!chargementListe && listeComptes && listeComptes.length === 0 && (
+          <p className="mt-2 text-sm text-cosy-ink/50">Aucun membre pour le moment.</p>
+        )}
+        {!chargementListe && listeComptes && listeComptes.length > 0 && (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-cosy-pink/10 text-left text-xs uppercase text-cosy-ink/50">
+                  <th className="py-2 pr-2">Email</th>
+                  <th className="py-2 pr-2">Points</th>
+                  <th className="py-2 pr-2">Cagnotte</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-cosy-pink/10">
+                {listeComptes.map((c) => (
+                  <tr key={c.userId}>
+                    <td className="py-2 pr-2">{c.email}</td>
+                    <td className="py-2 pr-2">{c.points}</td>
+                    <td className="py-2 pr-2">{formatPrix(c.soldeBonsCentimes)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </section>

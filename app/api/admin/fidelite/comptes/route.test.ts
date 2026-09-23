@@ -42,10 +42,36 @@ describe("GET /api/admin/fidelite/comptes", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 400 when email is missing", async () => {
+  it("returns the full list of accounts when email is missing", async () => {
     requireStaff.mockResolvedValue({ id: "staff-1", nom: "Alex" });
+    const order = vi.fn().mockResolvedValue({
+      data: [
+        { user_id: "client-1", points: 5, solde_bons_centimes: 0 },
+        { user_id: "client-2", points: 10, solde_bons_centimes: 1000 },
+      ],
+      error: null,
+    });
+    selectCompte.mockReturnValue({ order });
+    listUsers.mockResolvedValue({
+      data: {
+        users: [
+          { id: "client-1", email: "a@b.com" },
+          { id: "client-2", email: "c@d.com" },
+        ],
+      },
+      error: null,
+    });
+
     const res = await GET(new Request("http://localhost"));
-    expect(res.status).toBe(400);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({
+      comptes: [
+        { userId: "client-1", email: "a@b.com", points: 5, soldeBonsCentimes: 0 },
+        { userId: "client-2", email: "c@d.com", points: 10, soldeBonsCentimes: 1000 },
+      ],
+    });
   });
 
   it("returns 404 when no account matches the email", async () => {
