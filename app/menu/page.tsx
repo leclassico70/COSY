@@ -4,12 +4,12 @@ import { formatPrix } from "@/lib/money";
 export default async function MenuPage() {
   const supabase = await createSupabaseServerClient();
 
-  const { data: categories } = await supabase
+  const { data: categories, error: categoriesError } = await supabase
     .from("categories")
     .select("*")
     .order("ordre", { ascending: true });
 
-  const { data: produits } = await supabase
+  const { data: produits, error: produitsError } = await supabase
     .from("produits")
     .select("*")
     .order("ordre", { ascending: true });
@@ -17,6 +17,24 @@ export default async function MenuPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
       <h1 className="font-display text-3xl font-black uppercase text-cosy-pink">Notre menu</h1>
+
+      {/* DIAGNOSTIC TEMPORAIRE — à retirer une fois le problème de déploiement résolu */}
+      <pre className="mt-4 whitespace-pre-wrap rounded bg-black/80 p-3 text-xs text-lime-300">
+        {JSON.stringify(
+          {
+            url_present: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
+            url_prefix: (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").slice(0, 30),
+            anon_key_present: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+            anon_key_length: (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").length,
+            categories_count: categories?.length ?? null,
+            categories_error: categoriesError,
+            produits_count: produits?.length ?? null,
+            produits_error: produitsError,
+          },
+          null,
+          2
+        )}
+      </pre>
 
       {(categories ?? []).map((categorie) => {
         const produitsCategorie = (produits ?? []).filter((p) => p.categorie_id === categorie.id);
