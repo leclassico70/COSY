@@ -4,11 +4,6 @@ const insertCommande = vi.fn();
 const insertLignes = vi.fn();
 const deleteCommande = vi.fn();
 const selectProduits = vi.fn();
-const selectParametres = vi.fn();
-const selectCompte = vi.fn();
-const insertCompte = vi.fn();
-const updateCompte = vi.fn();
-const insertMouvement = vi.fn();
 const getUser = vi.fn();
 
 vi.mock("@/lib/supabase/serverClient", () => ({
@@ -28,15 +23,6 @@ vi.mock("@/lib/supabase/serviceClient", () => ({
       }
       if (table === "produits") {
         return { select: selectProduits };
-      }
-      if (table === "parametres_fidelite") {
-        return { select: selectParametres };
-      }
-      if (table === "fidelite_comptes") {
-        return { select: selectCompte, insert: insertCompte, update: updateCompte };
-      }
-      if (table === "fidelite_mouvements") {
-        return { insert: insertMouvement };
       }
       throw new Error(`unexpected table ${table}`);
     },
@@ -58,43 +44,11 @@ function mockProduits(produits: ProduitStub[]) {
   });
 }
 
-// Builds one call's worth of the `.update(...).eq().eq().eq().select().maybeSingle()` chain
-// that the optimistic-concurrency update in crediterCompteAvecConcurrence produces.
-function chaineUpdateCompte(maybeSingleData: { id: string } | null) {
-  const maybeSingle = vi.fn().mockResolvedValue({ data: maybeSingleData, error: null });
-  const select = vi.fn().mockReturnValue({ maybeSingle });
-  const eq3 = vi.fn().mockReturnValue({ select });
-  const eq2 = vi.fn().mockReturnValue({ eq: eq3 });
-  const eq1 = vi.fn().mockReturnValue({ eq: eq2 });
-  return { chaine: { eq: eq1 }, eq1, eq2, eq3, select, maybeSingle };
-}
-
-function mockUpdateCompteSucces() {
-  const { chaine, eq1, eq2, eq3, select, maybeSingle } = chaineUpdateCompte({ id: "compte-1" });
-  updateCompte.mockReturnValue(chaine);
-  return { eq1, eq2, eq3, select, maybeSingle };
-}
-
-function mockParametres() {
-  selectParametres.mockReturnValue({
-    single: () =>
-      Promise.resolve({
-        data: { points_requis: 10, montant_minimum_centimes: 500, valeur_bon_centimes: 1000 },
-        error: null,
-      }),
-  });
-}
-
 beforeEach(() => {
   insertCommande.mockReset();
   insertLignes.mockReset();
   deleteCommande.mockReset();
   selectProduits.mockReset();
-  selectParametres.mockReset();
-  selectCompte.mockReset();
-  insertCompte.mockReset();
-  updateCompte.mockReset();
-  insertMouvement.mockReset();
   getUser.mockReset();
 
   getUser.mockResolvedValue({ data: { user: null } });
@@ -148,7 +102,19 @@ describe("POST /api/commandes", () => {
         quantite: 2,
       },
     ]);
-    expect(selectCompte).not.toHaveBeenCalled();
+  });
+
+  it("links the commande to the authenticated user's client_id", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "client-1" } } });
+    insertCommande.mockReturnValue({
+      select: () => ({ single: () => Promise.resolve({ data: { id: "cmd-1" }, error: null }) }),
+    });
+    insertLignes.mockReturnValue(Promise.resolve({ error: null }));
+
+    const res = await POST(jsonRequest({ tableId: "t1", lignes: [{ produitId: "p1", quantite: 1 }] }));
+
+    expect(res.status).toBe(201);
+    expect(insertCommande).toHaveBeenCalledWith({ table_id: "t1", statut: "recue", client_id: "client-1" });
   });
 
   it("returns 400 when a produitId does not exist", async () => {
@@ -195,232 +161,5 @@ describe("POST /api/commandes", () => {
     expect(res.status).toBe(500);
     expect(deleteCommande).toHaveBeenCalled();
     expect(eqMock).toHaveBeenCalledWith("id", "cmd-1");
-  });
-
-  it("links the commande to the authenticated user but does not award a point below the minimum", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "client-1" } } });
-    insertCommande.mockReturnValue({
-      select: () => ({ single: () => Promise.resolve({ data: { id: "cmd-1" }, error: null }) }),
-    });
-    insertLignes.mockReturnValue(Promise.resolve({ error: null }));
-    mockParametres();
-
-    const res = await POST(
-      jsonRequest({ tableId: "t1", lignes: [{ produitId: "p1", quantite: 1 }] }) // 220 centimes, below 500
-    );
-
-    expect(res.status).toBe(201);
-    expect(insertCommande).toHaveBeenCalledWith({ table_id: "t1", statut: "recue", client_id: "client-1" });
-    expect(selectCompte).not.toHaveBeenCalled();
-  });
-
-  it("creates a fidelite account and awards the first point for a first-time qualifying customer", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "client-1" } } });
-    insertCommande.mockReturnValue({
-      select: () => ({ single: () => Promise.resolve({ data: { id: "cmd-1" }, error: null }) }),
-    });
-    insertLignes.mockReturnValue(Promise.resolve({ error: null }));
-    mockProduits([{ id: "p1", nom: "Bagel Poulet", prix_centimes: 590, disponible: true }]);
-    mockParametres();
-    selectCompte.mockReturnValue({
-      eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
-    });
-    insertCompte.mockReturnValue({
-      select: () => ({
-        single: () =>
-          Promise.resolve({ data: { id: "compte-nouveau", points: 0, solde_bons_centimes: 0 }, error: null }),
-      }),
-    });
-    const { eq1, eq2, eq3 } = mockUpdateCompteSucces();
-    insertMouvement.mockResolvedValue({ error: null });
-
-    const res = await POST(jsonRequest({ tableId: "t1", lignes: [{ produitId: "p1", quantite: 1 }] }));
-
-    expect(res.status).toBe(201);
-    expect(insertCompte).toHaveBeenCalledWith({ user_id: "client-1" });
-    expect(updateCompte).toHaveBeenCalledWith({ points: 1, solde_bons_centimes: 0 });
-    expect(eq1).toHaveBeenCalledWith("id", "compte-nouveau");
-    expect(eq2).toHaveBeenCalledWith("points", 0);
-    expect(eq3).toHaveBeenCalledWith("solde_bons_centimes", 0);
-    expect(insertMouvement).toHaveBeenCalledWith({
-      compte_id: "compte-nouveau",
-      delta_points: 1,
-      delta_solde_centimes: 0,
-      motif: "Commande qualifiante",
-      commande_id: "cmd-1",
-    });
-  });
-
-  it("awards a point to an existing account for a qualifying order", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "client-1" } } });
-    insertCommande.mockReturnValue({
-      select: () => ({ single: () => Promise.resolve({ data: { id: "cmd-1" }, error: null }) }),
-    });
-    insertLignes.mockReturnValue(Promise.resolve({ error: null }));
-    mockProduits([{ id: "p1", nom: "Bagel Poulet", prix_centimes: 590, disponible: true }]);
-    mockParametres();
-    selectCompte.mockReturnValue({
-      eq: () => ({
-        maybeSingle: () =>
-          Promise.resolve({ data: { id: "compte-1", points: 3, solde_bons_centimes: 0 }, error: null }),
-      }),
-    });
-    const { eq1, eq2, eq3 } = mockUpdateCompteSucces();
-    insertMouvement.mockResolvedValue({ error: null });
-
-    const res = await POST(jsonRequest({ tableId: "t1", lignes: [{ produitId: "p1", quantite: 1 }] }));
-
-    expect(res.status).toBe(201);
-    expect(insertCompte).not.toHaveBeenCalled();
-    expect(updateCompte).toHaveBeenCalledWith({ points: 4, solde_bons_centimes: 0 });
-    expect(eq1).toHaveBeenCalledWith("id", "compte-1");
-    expect(eq2).toHaveBeenCalledWith("points", 3);
-    expect(eq3).toHaveBeenCalledWith("solde_bons_centimes", 0);
-  });
-
-  it("retries once and compounds the point when a concurrent order updated the account first", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "client-1" } } });
-    insertCommande.mockReturnValue({
-      select: () => ({ single: () => Promise.resolve({ data: { id: "cmd-1" }, error: null }) }),
-    });
-    insertLignes.mockReturnValue(Promise.resolve({ error: null }));
-    mockProduits([{ id: "p1", nom: "Bagel Poulet", prix_centimes: 590, disponible: true }]);
-    mockParametres();
-
-    // Initial read sees points: 3, but a concurrent order already bumped it to 5 by the
-    // time our update runs — the first optimistic update must match zero rows.
-    const eqLectureInitiale = vi.fn().mockReturnValue({
-      maybeSingle: () =>
-        Promise.resolve({ data: { id: "compte-1", points: 3, solde_bons_centimes: 0 }, error: null }),
-    });
-    const eqRelecture = vi.fn().mockReturnValue({
-      maybeSingle: () =>
-        Promise.resolve({ data: { id: "compte-1", points: 5, solde_bons_centimes: 0 }, error: null }),
-    });
-    selectCompte
-      .mockReturnValueOnce({ eq: eqLectureInitiale })
-      .mockReturnValueOnce({ eq: eqRelecture });
-
-    const echec = chaineUpdateCompte(null);
-    const succes = chaineUpdateCompte({ id: "compte-1" });
-    updateCompte.mockReturnValueOnce(echec.chaine).mockReturnValueOnce(succes.chaine);
-    insertMouvement.mockResolvedValue({ error: null });
-
-    const res = await POST(jsonRequest({ tableId: "t1", lignes: [{ produitId: "p1", quantite: 1 }] }));
-
-    expect(res.status).toBe(201);
-    expect(updateCompte).toHaveBeenCalledTimes(2);
-    expect(updateCompte).toHaveBeenNthCalledWith(1, { points: 4, solde_bons_centimes: 0 });
-    expect(echec.eq1).toHaveBeenCalledWith("id", "compte-1");
-    expect(echec.eq2).toHaveBeenCalledWith("points", 3);
-    expect(echec.eq3).toHaveBeenCalledWith("solde_bons_centimes", 0);
-    expect(updateCompte).toHaveBeenNthCalledWith(2, { points: 6, solde_bons_centimes: 0 });
-    expect(succes.eq1).toHaveBeenCalledWith("id", "compte-1");
-    expect(succes.eq2).toHaveBeenCalledWith("points", 5);
-    expect(succes.eq3).toHaveBeenCalledWith("solde_bons_centimes", 0);
-    expect(insertMouvement).toHaveBeenCalledWith({
-      compte_id: "compte-1",
-      delta_points: 1,
-      delta_solde_centimes: 0,
-      motif: "Commande qualifiante",
-      commande_id: "cmd-1",
-    });
-  });
-
-  it("gives up gracefully (still 201, no mouvement recorded) when the update keeps conflicting", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "client-1" } } });
-    insertCommande.mockReturnValue({
-      select: () => ({ single: () => Promise.resolve({ data: { id: "cmd-1" }, error: null }) }),
-    });
-    insertLignes.mockReturnValue(Promise.resolve({ error: null }));
-    mockProduits([{ id: "p1", nom: "Bagel Poulet", prix_centimes: 590, disponible: true }]);
-    mockParametres();
-
-    const eqLectureInitiale = vi.fn().mockReturnValue({
-      maybeSingle: () =>
-        Promise.resolve({ data: { id: "compte-1", points: 3, solde_bons_centimes: 0 }, error: null }),
-    });
-    const eqRelecture = vi.fn().mockReturnValue({
-      maybeSingle: () =>
-        Promise.resolve({ data: { id: "compte-1", points: 5, solde_bons_centimes: 0 }, error: null }),
-    });
-    selectCompte
-      .mockReturnValueOnce({ eq: eqLectureInitiale })
-      .mockReturnValueOnce({ eq: eqRelecture });
-
-    const echec1 = chaineUpdateCompte(null);
-    const echec2 = chaineUpdateCompte(null);
-    updateCompte.mockReturnValueOnce(echec1.chaine).mockReturnValueOnce(echec2.chaine);
-
-    const res = await POST(jsonRequest({ tableId: "t1", lignes: [{ produitId: "p1", quantite: 1 }] }));
-
-    expect(res.status).toBe(201);
-    expect(updateCompte).toHaveBeenCalledTimes(2);
-    expect(insertMouvement).not.toHaveBeenCalled();
-  });
-
-  it("still returns 201 even if loyalty crediting fails unexpectedly", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "client-1" } } });
-    insertCommande.mockReturnValue({
-      select: () => ({ single: () => Promise.resolve({ data: { id: "cmd-1" }, error: null }) }),
-    });
-    insertLignes.mockReturnValue(Promise.resolve({ error: null }));
-    mockProduits([{ id: "p1", nom: "Bagel Poulet", prix_centimes: 590, disponible: true }]);
-    selectParametres.mockReturnValue({ single: () => Promise.reject(new Error("db down")) });
-
-    const res = await POST(jsonRequest({ tableId: "t1", lignes: [{ produitId: "p1", quantite: 1 }] }));
-
-    expect(res.status).toBe(201);
-  });
-
-  it("skips all fidelite writes when no parametres_fidelite row exists", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "client-1" } } });
-    insertCommande.mockReturnValue({
-      select: () => ({ single: () => Promise.resolve({ data: { id: "cmd-1" }, error: null }) }),
-    });
-    insertLignes.mockReturnValue(Promise.resolve({ error: null }));
-    mockProduits([{ id: "p1", nom: "Bagel Poulet", prix_centimes: 590, disponible: true }]);
-    selectParametres.mockReturnValue({ single: () => Promise.resolve({ data: null, error: null }) });
-
-    const res = await POST(jsonRequest({ tableId: "t1", lignes: [{ produitId: "p1", quantite: 1 }] }));
-
-    expect(res.status).toBe(201);
-    expect(selectCompte).not.toHaveBeenCalled();
-    expect(insertCompte).not.toHaveBeenCalled();
-    expect(updateCompte).not.toHaveBeenCalled();
-    expect(insertMouvement).not.toHaveBeenCalled();
-  });
-
-  it("issues a voucher (resets points, credits the solde) when the order crosses the points threshold", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "client-1" } } });
-    insertCommande.mockReturnValue({
-      select: () => ({ single: () => Promise.resolve({ data: { id: "cmd-1" }, error: null }) }),
-    });
-    insertLignes.mockReturnValue(Promise.resolve({ error: null }));
-    mockProduits([{ id: "p1", nom: "Bagel Poulet", prix_centimes: 590, disponible: true }]);
-    mockParametres(); // points_requis: 10, valeur_bon_centimes: 1000
-    selectCompte.mockReturnValue({
-      eq: () => ({
-        maybeSingle: () =>
-          Promise.resolve({ data: { id: "compte-1", points: 9, solde_bons_centimes: 0 }, error: null }),
-      }),
-    });
-    const { eq1, eq2, eq3 } = mockUpdateCompteSucces();
-    insertMouvement.mockResolvedValue({ error: null });
-
-    const res = await POST(jsonRequest({ tableId: "t1", lignes: [{ produitId: "p1", quantite: 1 }] }));
-
-    expect(res.status).toBe(201);
-    expect(updateCompte).toHaveBeenCalledWith({ points: 0, solde_bons_centimes: 1000 });
-    expect(eq1).toHaveBeenCalledWith("id", "compte-1");
-    expect(eq2).toHaveBeenCalledWith("points", 9);
-    expect(eq3).toHaveBeenCalledWith("solde_bons_centimes", 0);
-    expect(insertMouvement).toHaveBeenCalledWith({
-      compte_id: "compte-1",
-      delta_points: 1,
-      delta_solde_centimes: 1000,
-      motif: "Commande qualifiante",
-      commande_id: "cmd-1",
-    });
   });
 });

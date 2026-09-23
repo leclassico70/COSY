@@ -213,12 +213,12 @@ export function ProduitsClient({ categoriesInitiales, produitsInitiaux }: Props)
                     </div>
                   </li>
                 ) : (
-                  <li key={produit.id} className="flex items-center justify-between gap-4 py-3">
-                    <div>
+                  <li key={produit.id} className="flex flex-wrap items-center justify-between gap-4 py-3">
+                    <div className="min-w-0 flex-1">
                       <p className="font-semibold">{produit.nom}</p>
                       <p className="text-sm text-cosy-ink/60">{formatPrix(produit.prix_centimes)}</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-shrink-0 items-center gap-3">
                       <label className="flex items-center gap-2 text-sm">
                         <input
                           type="checkbox"

@@ -38,8 +38,8 @@ export default async function MenuPage() {
                       className="h-16 w-16 flex-shrink-0 rounded-lg object-cover"
                     />
                   )}
-                  <div className="flex flex-1 items-start justify-between gap-4">
-                    <div>
+                  <div className="flex min-w-0 flex-1 items-start justify-between gap-4">
+                    <div className="min-w-0">
                       <p className="font-semibold">
                         {produit.nom}
                         {!produit.disponible && (
