@@ -12,7 +12,11 @@ interface ParametresAffiches {
   valeurBonCentimes: number;
 }
 
-export function LoyaltyPopup() {
+interface Props {
+  hideTrigger?: boolean;
+}
+
+export function LoyaltyPopup({ hideTrigger = false }: Props) {
   const [parametres, setParametres] = useState<ParametresAffiches | null>(null);
   const [ouvert, setOuvert] = useState(false);
   const [mode, setMode] = useState<"info" | "inscription" | "connexion">("info");
@@ -102,12 +106,14 @@ export function LoyaltyPopup() {
 
   return (
     <>
-      <button
-        onClick={() => setOuvert(true)}
-        className="fixed bottom-24 right-4 z-40 rounded-pill bg-cosy-pink px-4 py-2 text-sm font-bold text-white shadow-lg"
-      >
-        🎁 Fidélité
-      </button>
+      {!hideTrigger && (
+        <button
+          onClick={() => setOuvert(true)}
+          className="fixed bottom-24 right-4 z-40 rounded-pill bg-cosy-pink px-4 py-2 text-sm font-bold text-white shadow-lg"
+        >
+          🎁 Fidélité
+        </button>
+      )}
 
       {ouvert && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">

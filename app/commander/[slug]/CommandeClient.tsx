@@ -111,7 +111,7 @@ export function CommandeClient({ table, categories, produits }: Props) {
       {cart.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 border-t border-cosy-pink/20 bg-white p-4">
           <div className="mx-auto flex max-w-2xl items-center justify-between gap-4">
-            <ul className="text-sm">
+            <ul className="max-h-24 flex-1 overflow-y-auto text-sm">
               {cart.map((item) => (
                 <li key={item.produitId} className="flex items-center gap-2">
                   <span>
@@ -130,7 +130,7 @@ export function CommandeClient({ table, categories, produits }: Props) {
             <button
               onClick={handleValider}
               disabled={envoiEnCours}
-              className="rounded-pill bg-cosy-pink px-6 py-3 font-display font-extrabold text-white disabled:opacity-50"
+              className="flex-shrink-0 rounded-pill bg-cosy-pink px-6 py-3 font-display font-extrabold text-white disabled:opacity-50"
             >
               {envoiEnCours ? "Envoi..." : `Commander · ${formatPrix(cartTotal(cart))}`}
             </button>
@@ -139,7 +139,7 @@ export function CommandeClient({ table, categories, produits }: Props) {
         </div>
       )}
 
-      <LoyaltyPopup />
+      <LoyaltyPopup hideTrigger={cart.length > 0} />
     </div>
   );
 }
